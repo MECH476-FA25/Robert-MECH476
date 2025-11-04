@@ -1,7 +1,7 @@
 ---
-title: "disasters"
-author: "JV"
-date: "2023-04-26"
+title: "Homework 4 - Disasters"
+author: "Thomas Robert"
+date: "2025-11-03"
 output: html_document
 ---
 
@@ -32,9 +32,9 @@ jvPalette <- c(
 disaster_raw <- read_csv("../data/time-series-US-1980-2023.csv", skip = 2)
 
 temp_raw <- read_csv("../data/us_temperature.csv", skip = 4)
-
+                      col_names = c("Date_Col", "Value", "Anomaly")
 temp <- temp_raw %>%
-  mutate(year = as.double(str_extract(Date, "\\d{4}")),
+  mutate(year = as.double(stringr::str_sub(Date_Col, 1, 4)),
          Value = (Value-32)*5/9) %>%
   select(year, Value)
 
