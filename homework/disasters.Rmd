@@ -1,0 +1,96 @@
+---
+title: "disasters"
+author: "JV"
+date: "2023-04-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+library(tidyverse)
+jvPalette <- c(
+  "#FFE380", "#FFCC00", "#FF9900", 
+  "#CC6633", "#FF6633", "#CC689A",
+  "#CC0066", "#FF3366", "#70AFC4",
+  "#0099CC", "#33CC99", "#339999",
+  "#175E46", "#664d99", "#330099",
+  "#801832")
+```
+
+# Read Data
+*Disaster Data Source*: https://www.ncei.noaa.gov/access/billions/time-series
+
+*Citation*: NOAA National Centers for Environmental Information (NCEI) U.S. Billion-Dollar Weather and Climate Disasters (2023). https://www.ncei.noaa.gov/access/billions/, DOI: 10.25921/stkw-7w73
+
+*US Temperature Data Source*: https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/national/time-series/110/tavg/12/7/1980-2023.csv?base_prd=true&begbaseyear=1980&endbaseyear=2023
+
+
+
+
+
+```{r read-data}
+disaster_raw <- read_csv("../data/time-series-US-1980-2023.csv", skip = 2)
+
+temp_raw <- read_csv("../data/us_temperature.csv", skip = 4)
+
+temp <- temp_raw %>%
+  mutate(year = as.double(str_extract(Date, "\\d{4}")),
+         Value = (Value-32)*5/9) %>%
+  select(year, Value)
+
+disaster_count <- disaster_raw %>%
+  select(Year, contains("Count")) %>%
+  pivot_longer(cols = matches("Count"),
+               names_to = "type",
+               values_to = "count") %>%
+  mutate(type = str_extract(type, ".*?(?=\\sCount\\b)"))
+  
+disaster_cost <- disaster_raw %>%
+  select(Year, contains("Cost")) %>%
+  pivot_longer(cols = matches("Cost"),
+               names_to = "type",
+               values_to = "cost") %>%
+  mutate(type = str_extract(type, ".*?(?=\\sCost\\b)"))
+
+disaster_all <- left_join(disaster_cost, disaster_count, by = c("Year", "type")) 
+
+```
+
+# Plot
+
+```{r plot, warning=TRUE}
+max_first  <- 25   # Specify max of first y axis
+max_second <- max(temp$Value) # Specify max of second y axis
+min_first  <- 0   # Specify min of first y axis
+min_second <- min(temp$Value) # Specify min of second y axis
+
+b <- (max_first-min_first)/(max_second-min_second)
+a <- min_first-b*min_second
+
+ggplot() +
+  geom_col(data = filter(disaster_all, type != "All Disasters"),
+           aes(x = Year,
+               y = count,
+               fill = type)) +
+  geom_smooth(data = temp,
+              aes(x=year,
+                  y = (a + b*Value)),
+              method = "loess",
+              color = "blue",
+              se = FALSE) +
+  scale_y_continuous(name = "Number of Events (> $1B)", 
+                     sec.axis = sec_axis(~ (. - a)/b, 
+                                         name = "Average US Temperature, °C")) +
+  xlab("") +
+  scale_fill_manual(values = jvPalette[c(1,3,5,9,11,7,15)]) +
+  theme_light(base_size = 16) +
+  guides(fill = guide_legend(position = "inside")) +
+    theme(legend.position.inside = c(0.16, 0.76),
+        legend.title = element_blank(),
+        legend.background = element_blank(),
+        axis.text.y.right = element_text(color = "blue"),
+        axis.title.y.right = element_text(color = "blue",
+                                          vjust = 0.9))
+```
+
+
