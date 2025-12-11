@@ -33,6 +33,12 @@ Load the necessary R packages into your R session.
 
 ```{r packages, message=FALSE}
 # load packages
+
+library("dplyr")
+library("ggplot2")
+library("readr")
+library("knitr")
+library("kableExtra")
 ```
 
 Recreate the pipe of `dplyr` functions that you used to import the data, select
@@ -44,12 +50,22 @@ output with a good name.
 
 ```{r import-data, message=FALSE}
 # ozone: import, select, drop missing observations, rename
+
+ppm_and_t <- read_csv("/Users/thomasrobert08/Documents/University /Colorado State University /Courses/Senior/Fall '25/Data Analysis in R/homework/ozone.csv") %>% 
+  dplyr::select(sample_measurement, datetime) %>% 
+  filter(!is.na(sample_measurement), 
+         !is.na(datetime)) %>% 
+  rename(ozone_ppm = sample_measurement)
+
 ```
 
 Check that the data imported correctly.
 
 ```{r data-check}
 # examine dataframe object 
+
+ppm_and_t
+
 ```
 
 \newpage
@@ -73,6 +89,9 @@ Calculate the quartiles of `ozone_ppm`. What is the minimum? Maximum? Median?
 
 ```{r ozone-quartiles}
 # calculate quantiles of ozone concentration
+
+summary(ppm_and_t)
+
 ```
 
 ### Extra Credit
@@ -91,6 +110,26 @@ Add axis labels, title, subtitle, and theme.
 
 ```{r ozone-cd}
 # plot cumulative distribution of ozone concentration
+
+ppm_and_t %>% 
+  ggplot(aes(x = ozone_ppm)) + 
+  stat_ecdf(geom = "step") + 
+  scale_x_continuous(
+    breaks = seq(0.00, 0.04, by = 0.005),
+    minor_breaks = seq(0.00, 0.04, by = 0.001)
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, 1, by = 0.02),
+    minor_breaks = seq(0, 1, by = 0.05)
+  ) +
+  labs(
+    title = "Ozone Data Cumulative Distribution",
+    subtitle = "Jan 2019 - Jan 2020", 
+    x = "Ozone measurement (ppm)", 
+    y = "Cumulative Proportion"
+    ) + 
+  theme_light() 
+
 ```
 
 \newpage
@@ -105,21 +144,39 @@ instead of "Cumulative Distribution Plot".
 
 ```{r ozone-hist}
 # create histogram of ozone concentration
+
+ppm_and_t %>%
+  ggplot(aes(x = ozone_ppm)) + 
+  geom_histogram(bins = 50, fill = "lightblue", color = "black") +
+  labs(
+    title = "Ozone Data Histogram",
+    subtitle = "Jan 2019 - Jan 2020",
+    x = "Ozone Measurement (ppm)",
+    y = "Count"
+  ) +
+  theme_light()
+
 ```
 
 ### Question 5: Concept
 
 What mathematical concept is a histogram (Q4) attempting to visualize? 
 
+Visualizes a distribution of data
+
 ### Question 6: Distribution
 
 Based on the histogram (Q4), does ozone concentration appear to be normally
 distributed? 
 
+I would say that for the most part, it is. A good amount of the data is at a zero ppm value, but if one disregards this, the rest of the histogram is quite normally distributed. And this makes sense logically as well. 
+
 ### Question 7: Outliers
 
 Based on the histogram (Q4), do you see any possible outliers? Skewness? How
 might this affect the spread and central tendency?
+
+As I mentioned in question 6, we see a few values at the zero ppm measurement. This skews the data, but makes sense logically. The central tendency in this case shifts towards lower amounts. 
 
 \newpage
 
@@ -132,6 +189,19 @@ labels to remove the x-axis scale and label.
 
 ```{r ozone-boxplot}
 # create ozone boxplot
+
+ppm_and_t %>%
+  ggplot(aes(x= "", y = ozone_ppm)) +
+  geom_boxplot(fill = "salmon", color = "black") +
+  labs(
+    title = "Ozone Data Boxplot", 
+    subtitle = "Jan 2019 - Jan 2020", 
+    y = "Ozone Measurement (ppm", 
+    x = ""
+  ) +
+  theme_light()
+  )
+
 ```
 
 \newpage
@@ -148,14 +218,16 @@ could have been done (e.g., `dplyr::filter()` with `%in%` operator).
 # create subset of data with only one day to examine daily pattern
 # I did not ask you to code this because we have not discussed dates or stringr
 # You need to uncomment the below three lines and run it; check object names
-# ozone_day <- ozone_data %>% 
-#   dplyr::filter(stringr::str_detect(string = datetime,
-#                                     pattern = "2019-07-04"))
+ ozone_day <- ppm_and_t %>% 
+   dplyr::filter(stringr::str_detect(string = datetime,
+                                     pattern = "2019-07-04"))
 ```
 
 ## Question 9: Autocorrelation Plot
 
 Define autocorrelation as it relates to ozone concentration measurement. 
+
+autocorrelation measures how much the current value of a variable is linearly related to its past values
 
 Create an autocorrelation plot of ozone concentration, using `stats::acf()` and
 include axis labels and title. Describe what you see based on the features of
@@ -163,6 +235,14 @@ interest outlined in the coursebook.
 
 ```{r ozone-acf}
 # create autocorrelation plot with ozone_day df
+
+stats::acf(
+  x = ozone_day$ozone_ppm,
+  main = "Autocorrelation of Ozone Concentration (July 4, 2019)", 
+  xlab = "Lag (Hours)", 
+  ylab = "Autocorrelation Function (ACF)"
+)
+
 ```
 
 \newpage
@@ -171,12 +251,22 @@ interest outlined in the coursebook.
 
 Define partial autocorrelation as it relates to ozone concentration measurement.
 
+partial autocorrelation as it relates to ozone concentration measurements tells us the relationship between two measurements made close to each other in time
+
 Now create a partial autocorrelation plot of day ozone concentration with axis
 labels. Describe what you see. How does this compare to the autocorrelation
 plot in the previous question?
 
 ```{r ozone-part-acf}
 # create partial autocorrelation plot
+
+stats::pacf(
+  x = ozone_day$ozone_ppm,
+  main = "Partial Autocorrelation of Ozone Concentrations (July 4, 2019)",
+  xlab = "Lag (Hours)",
+  ylab = "Partial Autocorrelation FUnction (PACF)"      
+)
+
 ```
 
 \newpage
