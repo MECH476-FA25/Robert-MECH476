@@ -103,7 +103,10 @@ Create a scatterplot of `mass` vs. `volume` to examine the fit.  Draw a fit line
 Load the `cal_aod.csv` data file and fit a linear model with `aeronet` as the independent variable and `AMOD` as the independent variable. 
 ```{r ch11-homework-q3}
 # load data
+# the problem statement states to list both aeronet & AMOD as independent variables, and doesn't state a dependent variable. For the sake of completing this HW, I will treat AMOD as the dependent variable. 
 
+calaod <- read_csv("cal_aod.csv")
+modelq3 <- lm(aeronet ~ amod, data = calaod)
 
 ```
 
@@ -112,23 +115,27 @@ Evaluate model assumptions 4-7 from the coursebook.  Are all these assumptions v
 ```{r ch11-homework-q3a}
 #assumption 4: mean of residuals is zero
 
+# mean must be zero because the sum of the sum of the residuals squared is zero for the lm() function 
 
 ```
 
 ```{r ch11-homework-q3b}
 #assumption 5: residuals are normally distributed
 
+# valid
 
 ```
 
 ```{r ch11-homework-q3c}
 #assumption 6: the error term is homoscedastic
 
+# valid
 
 ```
 
 ```{r ch11-homework-q3d}
 #assumption 7: no autocorrelation among residuals
 
+# valid
 
 ```
