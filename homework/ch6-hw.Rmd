@@ -1,15 +1,17 @@
 ---
 title: 'MECH476: Engineering Data Analysis in R'
 subtitle: 'Chapter 6 Homework: Strings, Dates, and Tidying' 
-author: 'Student Name'
-date: '`r format(Sys.time(), "%d %B, %Y")`'
+author: 'Thomas Robert'
+date: 'Dec 11'
 output: pdf_document
 ---
 
 ```{r global-options, include=FALSE}
+
 # set global options for figures, code, warnings, and messages
 knitr::opts_chunk$set(fig.width=6, fig.height=4, fig.path="../figs/",
-                      echo=FALSE, warning=FALSE, message=FALSE)
+                      echo=FALSE, warning=FALSE, message=FALSE)\
+
 ```
 
 # Chapter 6 Homework
@@ -38,8 +40,24 @@ element. How many hashtags were used by Colorado senators?
 
 ```{r hashtags}
 # wildfire hashtag list
-```
 
+library(tidyverse)
+library(dplyr)
+co_senators_data <- read_csv("senators_co.csv")
+print(co_senators_data)
+
+colorado_tweets <- co_senators_data %>%
+  filter(state == "CO")
+print(paste("Total Colorado Tweets:", nrow(colorado_tweets)))
+
+total_hashtags <- colorado_tweets %>%
+  select(text) %>%
+  mutate(hashtags = stringr::str_extract_all(text, pattern = r"(#\w+)")) %>%
+  unnest(hashtags) %>%
+  tally()
+print(total_hashtags)
+
+```
 ## Question 2: Fires
 
 Colorado is on fire right now and has experienced many wildfires over the years.
@@ -49,6 +67,18 @@ the hashtags that include "fire" or "wildfire". How many hashtags included
 "fire"? How many included "wildfire"?
 
 ```{r hashtag-fire}
+
+hashtag_list_df <- colorado_tweets %>%
+  select(text) %>%
+  mutate(hashtags = stringr::str_extract_all(text, pattern = r"(#\w+)")) %>%
+  tidyr::unnest(hashtags)
+
+fire_count_df <- hashtag_list_df %>%
+  filter(str_detect(hashtags, pattern = regex("fire", ignore_case = TRUE))) %>%
+  tally()
+fire_count <- fire_count_df$n
+print(paste("Number of hashtags containing 'fire':", fire_count))
+
 ```
 
 ## Question 3: Wildfires 
@@ -61,6 +91,14 @@ corresponding timestamp and user. Specifically, (a) select `text`, `date`, and
 
 ```{r wildfire}
 # filter to tweets concerning wildfires
+
+wildfire_tweets <- co_senators_data %>%
+  select(text, created_at, user) %>%
+  filter(stringr::str_detect(text, pattern = stringr::regex("wildfire", ignore_case = TRUE)))
+head(wildfire_tweets)
+
+print(paste("Total tweets containing 'wildfire':", nrow(wildfire_tweets)))
+
 ```
 
 ## Question 4: Senators
@@ -69,6 +107,13 @@ Which Colorado senator tweets more about wildfires?
 
 ```{r wildfire-senator}
 # number of wildfire tweets by senator
+
+senator_wildfire_counts <- wildfire_tweets %>%
+  group_by(user) %>%
+  tally() %>%
+  arrange(desc(n))
+print(senator_wildfire_counts)
+
 ```
 
 ## Question 5: Timing
@@ -80,6 +125,16 @@ about what happened in the previous year.)
 
 ```{r wildfire-timing}
 # number of wildfire tweets by year 
+
+wildfire_tweets_by_year <- wildfire_tweets %>%
+  mutate(created_at_dt = lubridate::parse_date_time(created_at, orders = "m d y H M")) %>%
+  mutate(tweet_year = lubridate::year(created_at_dt)) %>%
+  filter(tweet_year >= 2011 & tweet_year <= 2017) %>%
+  group_by(tweet_year) %>%
+  tally() %>%
+  arrange(tweet_year)
+print(wildfire_tweets_by_year)
+
 ```
 
 \newpage
@@ -91,6 +146,29 @@ at a certain time of year? Hints: Convert `month` to a factor. Fill by `user`.
 
 ```{r tweet-count-month}
 # create plot of tweets by month and user
+
+library(ggplot2)
+monthly_tweet_summary <- colorado_tweets %>%
+  mutate(tweet_date = lubridate::parse_date_time(created_at, orders = "m d y H M")) %>%
+  mutate(tweet_month = lubridate::month(tweet_date, label = TRUE, abbr = FALSE)) %>%
+  group_by(tweet_month, user) %>%
+tally() %>%
+  ungroup()
+print(monthly_tweet_summary)
+
+monthly_activity_chart <- ggplot(monthly_tweet_summary,
+                                 aes(x = tweet_month, y = n, fill = user)) + 
+  geom_col(position = "dodge") + 
+  labs(title = "Monthly Tweet Activity of Colorado Senators (2011-2017)",
+       subtitle = "Comparing activity by Senator (Fill by user)",
+       x = "Month",
+       y = "Total Tweets",
+       fill = "Senator") +
+scale_fill_brewer(palette = "Set1") +
+theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(monthly_activity_chart)
+
 ```
 
 \newpage
@@ -102,6 +180,19 @@ tweeting.
 
 ```{r tweet-count-hour}
 # create plot of cumulative hourly tweets by senator
+
+tweet_hour_data <- colorado_tweets %>%
+  mutate(tweet_date = lubridate::parse_date_time(created_at, orders = "m d y H M")) %>%
+  mutate(tweet_hour = lubridate::hour(tweet_date))
+
+ggplot(tweet_hour_data, aes(x = tweet_hour)) +
+  geom_histogram(binwidth = 1, fill = "darkred", color = "white") +
+  scale_x_continuous(breaks = seq(0, 23, by = 2)) +
+  labs(title = "Distribution of Colorado Senator Tweets by Hour of Day (24hr)",
+       x = "Hour of Day (0 = Midnight, 12 = Noon)",
+       y = "Number of Tweets") +
+  theme_minimal()
+
 ```
 
 \newpage
