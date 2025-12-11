@@ -1,8 +1,8 @@
 ---
 title: 'MECH481A6: Engineering Data Analysis in R'
 subtitle: 'Chapter 11 Homework: Modeling' 
-author: 'Student Name'
-date: '`r format(Sys.time(), "%d %B, %Y")`'
+author: 'Thomas Robert'
+date: '`Dec. 11`'
 output: pdf_document
 ---
 
@@ -17,7 +17,8 @@ knitr::opts_chunk$set(fig.width=6, fig.height=4, fig.path="../figs/",
 ```{r load-packages, message=FALSE}
 # load packages for current session
 library(tidyverse) 
-library(gridExtra) 
+library(gridExtra)
+library(car)
 ```
 
 # Chapter 11 Homework
@@ -41,7 +42,21 @@ Evaluate assumption 3 about whether there is collinearity among these variables.
 
 
 ```{r ch11-homework-q1, echo=FALSE, include=FALSE}
+bodysize_data <- read_csv("bodysize.csv")
 
+model1 <- lm(height ~ waist, data = bodysize_data)
+model2 <- lm(height ~ mass, data = bodysize_data)
+model3 <- lm(height ~ waist + mass, data = bodysize_data)
+
+summary(model1)$coefficients
+summary(model2)$coefficients
+summary(model3)
+
+vif(model3)
+
+# VIF value is over the threshold of 5, which is high enough to indicate muticollinearity. This value indicates that the variance is over 5x larger than it would be if the two predictors were completely uncorrelated. 
+
+# No, I do not trust the individual coefficients from models 1 & 2 based on the VIF from model 3. This value indicates that height is predicted by waist + mass and that there is a strong enough correlation between the two that height depends on both, and neither one alone. 
 ```
 
 ## Question 2
@@ -49,8 +64,22 @@ Create a new variable in the `bodysize` data frame using `dplyr::mutate`. Call t
 
 ```{r ch11-homework-q2}
 
+bodysize_data <- bodysize_data %>%
+  mutate(volume = (waist^2) * height)
 
+modelq2 <- lm(mass ~ volume, data = bodysize_data)
 
+summary(modelq2)
+
+bodysize_data %>%
+ggplot(aes(x = volume, y = mass)) + 
+  geom_point(alpha = 0.5) + 
+  stat_smooth(method = "lm", col = "red") +
+  labs(
+    title = "Prediction of Mass using Waist^2 * Height (Volume)",
+    x = "Volume",
+    y = "Mass"
+  ) 
 
 ```
 
@@ -58,6 +87,7 @@ Does this variable explain more of the variance in `mass` from the NHANES data? 
 
 ```{r ch11-homework-q2a}
 
+# Yes it does. I know because the R^2 value is 0.87 compared to 0.43 which is much higher. 
 
 ```
 
@@ -65,6 +95,7 @@ Create a scatterplot of `mass` vs. `volume` to examine the fit.  Draw a fit line
 
 ```{r ch11-homework-q2b}
 
+# created my scatterplot in the earlier part of this question
 
 ```
 
