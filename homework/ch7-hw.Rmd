@@ -8,8 +8,10 @@ output: pdf_document
 
 ```{r global-options, include=FALSE}
 # set global options for figures, code, warnings, and messages
+
 knitr::opts_chunk$set(fig.width=6, fig.height=4, fig.path="../figs/",
                       echo=FALSE, warning=FALSE, message=FALSE)
+
 ```
 
 # Load packages
@@ -20,6 +22,9 @@ knitr::opts_chunk$set(fig.width=6, fig.height=4, fig.path="../figs/",
 library(tidyverse)
 library(ggplot2)
 library(janitor)
+library(splines)
+library(dplyr)
+library(scales)
 
 ```
 
@@ -97,10 +102,25 @@ ME_salaries_data <- ME_salaries_data %>%
   dplyr::rename_with(tolower)
 
 ME_salaries_data_cleaned <- ME_salaries_data %>%
-  mutate(gender = as.factor(gender) %>%
+  mutate(gender = as.factor(gender)) %>%
   filter(salary != 0)
   #copied from first part of this problem
 
+#next block removes the outliers
+iqr_stats <- ME_salaries_data_cleaned %>%
+  summarise(
+    Q1 = quantile(salary, 0.25),
+    Q3 = quantile(salary, 0.75),
+    IQR = Q3 - Q1,
+    Lower_Fence = Q1 - 1.5 * IQR,
+    Upper_Fence = Q3 + 1.5 * IQR
+  )
+lower_bound <- iqr_stats$Lower_Fence
+upper_bound <- iqr_stats$Upper_Fence
+ME_salaries_data_cleaned <- ME_salaries_data_cleaned %>%
+  filter(salary >= lower_bound, salary <= upper_bound)
+
+#next block counts levels
 levels(ME_salaries_data_cleaned$gender)
 nlevels(ME_salaries_data_cleaned$gender)
 
@@ -116,6 +136,42 @@ approach accordingly.
 ```{r univariate-eda, include=FALSE}
 # univariate eda
 
+ME_salaries_data_cleaned %>%
+  summarise(
+    N = n(),
+    mean_age = mean(age, na.rm = TRUE), 
+    median_age = median(age, na.rm = TRUE),
+    sd_age = sd(age, na.rm = TRUE), 
+    min_age = min(age, na.rm = TRUE), 
+    max_age = max(age, na.rm = TRUE)
+  )
+
+ggplot(ME_salaries_data_cleaned, aes(x = age)) +
+  geom_histogram(binwidth = 4, fill = "darkgreen", color = "white") +
+  labs(title = "Distribution of Age", x = "Age (Years)", y = "Count") + theme_classic()
+
+#code above this comment explores age
+
+ME_salaries_data_cleaned %>%
+  dplyr::count(gender, sort = TRUE, name = "Count") %>%
+  dplyr::mutate(Proportion = Count / sum(Count))
+
+ggplot(ME_salaries_data_cleaned, aes(x = gender)) +
+  geom_bar(fill = "darkgreen", color = "white") +
+  labs(title = "Count of Observations by Gender", x = "Gender Category", y = "Count") +
+  theme_classic()
+
+#code above this comment explores gender
+
+ggplot(ME_salaries_data_cleaned, aes(x = salary)) +
+  geom_histogram(bins = 50, fill = "darkgreen", color = "white") + 
+  labs(
+    title = "Distribution of Salary (All Observations)", 
+    x = "Salary ($)", 
+    y = "Count"
+  ) +
+  theme_classic()
+
 ```
 
 \newpage
@@ -128,6 +184,15 @@ Create a histogram of `salary`, faceted by `gender`. Add `bins = 50` and
 ```{r hist-salary}
 # histogram of salaries split by gender
 
+ggplot(ME_salaries_data_cleaned, aes(x = salary, fill = gender)) +
+  geom_histogram(bins = 50, color = "lightgrey", position = "identity", alpha = 0.6) + 
+  labs(title = "Salary Distribution by Gender",
+  x = "Salary ($)",
+  y = "Count"
+) +
+  theme_classic() +
+scale_fill_manual(values = c("Female" = "darkgreen", "Male" = "steelblue"))
+
 ```
 
 Create a histogram of `age`, faceted by `gender`. Add `bins = 50` and 
@@ -135,6 +200,15 @@ Create a histogram of `age`, faceted by `gender`. Add `bins = 50` and
 
 ```{r hist-age}
 # histogram of ages split by gender
+
+ggplot(ME_salaries_data_cleaned, aes(x = age, fill = gender)) +
+  geom_histogram(bins = 50, color = "lightgrey", position = "identity", alpha = 0.6) + 
+  labs(title = "Age Distribution Overlaid by Gender",
+  x = "Age (Years)",
+  y = "Count"
+) +
+  theme_classic() +
+scale_fill_manual(values = c("Female" = "darkgreen", "Male" = "steelblue"))
 
 ```
 
@@ -148,12 +222,34 @@ better visualize the outliers.
 ```{r salary-box}
 # boxplots of salary data by gender
 
+ggplot(ME_salaries_data_cleaned, aes(x = gender, y = salary, fill = gender)) +
+  geom_boxplot(outlier.shape = 1) + 
+  facet_wrap(~ gender, scales = "free_x") +
+  labs(
+    title = "Salary Distribution by Gender (Outliers Highlighted)",
+    x = "Gender Category",
+    y = "Salary ($)"
+  ) +
+  theme_classic() +
+  scale_fill_manual(values = c("Female" = "darkgreen", "Male" = "steelblue"))
+
 ```
 
 Create a boxplot of `age`, faceted by `gender`.
 
 ```{r age-box}
 # boxplots of age data by gender
+
+ggplot(ME_salaries_data_cleaned, aes(x = gender, y = age, fill = gender)) +
+  geom_boxplot() + 
+  facet_wrap(~ gender, scales = "free_x") +
+  labs(
+    title = "Age Distribution by Gender",
+    x = "Gender Category",
+    y = "Age (Years)"
+  ) +
+theme_classic() +
+scale_fill_manual(values = c("Female" = "darkgreen", "Male" = "steelblue"))
 
 ```
 
@@ -167,13 +263,35 @@ Create a scatterplot of `age` (x-axis) and `salary`, differentiating by
 ```{r multivar-scatter}
 # scatterplot of salary across age by gender
 
+ggplot(ME_salaries_data_cleaned, aes(x = age, y = salary, color = gender)) +
+  geom_point(alpha = 0.5) + 
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Salary vs. Age, Differentiated by Gender",
+    x = "Age (Years)",
+    y = "Salary ($)"
+  ) +
+  theme_classic() +
+  scale_color_manual(values = c("Female" = "darkgreen", "Male" = "steelblue"))
+
 ```
 
 *Bonus point*: Is there a correlation between an engineer's salary and age?
+
+According to the data, there is. The older the engineer, the higher the salary. This is applicable for both men and women. 
+
 What is the estimated Pearson correlation coefficient *r*? Run a formal test.
 
 ```{r corr-test}
 # correlation test
+
+overall_correlation <- cor.test(
+  x = ME_salaries_data_cleaned$age, 
+  y = ME_salaries_data_cleaned$salary, 
+  method = "pearson"
+)
+print("--- Overall Pearson Correlation and Test ---")
+overall_correlation
 
 ```
 
@@ -188,6 +306,18 @@ differences the farther up you go on a log scale axis.
 
 ```{r salary-ecdf}
 # plot cdf of salary by gender
+
+ggplot(ME_salaries_data_cleaned, aes(x = salary, color = gender)) +
+  stat_ecdf(size = 1) + 
+  scale_x_log10(limits = c(5e4, 5e5), 
+  labels = scales::dollar_format(accuracy = 1)) +
+  labs(
+    title = "Cumulative Distribution Function of Salary by Gender (Log Scale)",
+    x = "Salary (Log Scale $)",
+    y = "Cumulative Proportion (ECDF)"
+  ) +
+  theme_classic() +
+  scale_color_manual(values = c("Female" = "darkgreen", "Male" = "steelblue"))
 
 ```
 
@@ -204,14 +334,26 @@ scientific notation in the text output; check the knitted document.
 ```{r salary-quantiles, message=FALSE}
 # calculate quantiles of salary by gender
 
+salary_quantiles_df <- ME_salaries_data_cleaned %>%
+  group_by(gender) %>%
+  summarise(
+    Q25 = quantile(salary, 0.25),
+    Q50_Median = quantile(salary, 0.50),
+    Q75 = quantile(salary, 0.75),
+    .groups = 'drop'
+  )
+options(scipen = 999)
+print(salary_quantiles_df)
+options(scipen = 0)
+
 ```
 
-What is the difference in salary between men and women at the median? 
+What is the difference in salary between men and women at the median?
 
-  * Median salary for women is 
-  * Median salary for men is 
-  * The difference at the median is 
-  
+  * Median salary for women is : $90k
+  * Median salary for men is : $95k
+  * The difference at the median is : $5k
+ 
 At the top percentile (maximum)? 
 
   * Maximum salary for women is 
