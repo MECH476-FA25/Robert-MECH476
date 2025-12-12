@@ -1,8 +1,8 @@
 ---
 title: 'MECH476: Engineering Data Analysis in R'
 subtitle: 'Chapter 7 Homework: Multivariate Exploratory Data Analysis' 
-author: 'Student Name'
-date: '`r format(Sys.time(), "%d %B, %Y")`'
+author: 'Thomas Robert'
+date: 'Dec 11'
 output: pdf_document
 ---
 
@@ -16,6 +16,10 @@ knitr::opts_chunk$set(fig.width=6, fig.height=4, fig.path="../figs/",
 
 ```{r load-packages, message=FALSE}
 # load packages for current session
+
+library(tidyverse)
+library(ggplot2)
+library(janitor)
 
 ```
 
@@ -44,12 +48,36 @@ recorded as 0. Assign this to a dataframe object with a meaningful name.
 ```{r import-data}
 # import and tidy salary data
 
+ME_salaries_data <- read_csv("ME_salaries.csv")
+
+ME_salaries_data <- ME_salaries_data %>%
+  dplyr::rename_with(tolower)
+
+ME_salaries_data <- ME_salaries_data %>%
+  mutate(gender = as.factor(gender)) %>%
+  filter(salary != 0)
+
+print(ME_salaries_data)
+
 ```
 
 How many observations have a 0 (zero) value for salary? Note: The last question asked you to remove these observations from the resultant data frame.
 
 ```{r salary-zero}
 # number of observations with salary as 0 
+
+#run this code independently from first part of the problem 
+
+ME_salaries_data <- read_csv("ME_salaries.csv")
+
+ME_salaries_data <- ME_salaries_data %>%
+  dplyr::rename_with(tolower)   #copied the original data set from first part of the question 
+
+zero_salary_count <- ME_salaries_data %>%
+  dplyr::filter(salary == 0) %>%
+  nrow()      #counts the salaries equal to zero in the original data set
+
+print(paste("Number of observations with $0 salary in original dataset:", zero_salary_count))
 
 ```
 
@@ -60,6 +88,21 @@ is binary term).
 
 ```{r gender-levels}
 # number of factor levels
+
+#run this code independently from first parts of this problem
+
+ME_salaries_data <- read_csv("ME_salaries.csv")
+
+ME_salaries_data <- ME_salaries_data %>%
+  dplyr::rename_with(tolower)
+
+ME_salaries_data_cleaned <- ME_salaries_data %>%
+  mutate(gender = as.factor(gender) %>%
+  filter(salary != 0)
+  #copied from first part of this problem
+
+levels(ME_salaries_data_cleaned$gender)
+nlevels(ME_salaries_data_cleaned$gender)
 
 ```
 
