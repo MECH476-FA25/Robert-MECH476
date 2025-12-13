@@ -57,11 +57,31 @@ Modify the function `import.w.name()` to import the “date” part of the filen
 # create an object that tracks the file names and file paths
 # see the coursebook for details
 
-import.w.name2 <- function(file_path) {
+# in R chunk `r import.w.name2, include=FALSE`
+library(readr) # Needed for read_csv
+
+# modify the import.w.name function
+import.w.name <- function(file_path) {
+  # 1. Read the CSV file (Must be done first)
+  data <- read_csv(file_path, show_col_types = FALSE) 
+  
   file_name <- basename(file_path)
+  
+  # 2. Extract Sensor ID (part before the first underscore)
+  sensor_id <- sub("([^_]+).*", "\\1", file_name)
+  
+  # 3. Extract Date (using the regex hint)
   date_match <- regexpr("(?<=_)[[:alnum:]]+(?=\\.)", file_name, perl = TRUE)
   date_string <- regmatches(file_name, date_match)
-  return(date_string)
+  
+  # 4. Add the new columns and return the data frame
+  data <- data %>%
+    mutate(
+      sensor_id = sensor_id,
+      date_created = date_string
+    )
+  
+  return(data)
 }
 
 # modify the import.w.name function
@@ -74,36 +94,85 @@ This question is designed to give you practice at data cleaning. First, create a
 ```{r map-dplyr-pipe, warning=FALSE, message=FALSE, include=FALSE}
 # the map code is provided in the coursebook
 
-data_dir <- "purpleair" # <-- Using the exact folder name 'purpleair'
-file_paths <- list.files(
-  path = data_dir, 
-  pattern = "\\.csv$", # Only look for .csv files
-  full.names = TRUE
-)
-PA_data_merged <- file_paths %>%
-  purrr::map_dfr(import.w.name) 
-PA_data_merged <- PA_data_merged %>% 
-  mutate(
-    UTCDateTime = ymd_hms(UTCDateTime) 
-  ) %>%
-  rename(
-    temp_f = current_temp_f,  
-    humidity = current_humidity 
-  )
-print(paste("The merged data frame has:", nrow(PA_data_merged), "rows,", ncol(PA_data_merged), "columns"))
-glimpse(PA_data_merged)
+PA_data_merged <- purrr::map_dfr(file_list, import.w.name) %>%
+rename(temp_f = current_temp_f, humidity = current_humidity)
+bad_idx <- which(is.na(PA_data_merged$datetime))
+bad_rows <- filter(PA_data_merged, is.na(datetime))
 
 ```
 
 ## Question 4
 Can you find the 3 indices of UTCDateTime in PA_data_merged that failed to parse with lubridate::? Hint: use the `is.na()` function nested wihtin `which()` to return the row numbers in question. Both of these are baseR functions. Once you have the row entries identified you can `View()` them with a call to `slice()`.: normal entries in UTCDateTime are all the same number of characters nchar() or entries that failed to parse in the new date column will have NA associated with them.
+
 ```{r find-NAs, include=FALSE}
 
+bad_idx <- which(is.na(PA_data_merged$UTCDateTime))
+bad_rows <- PA_data_merged[bad_idx, ]
+print("Row Indices that failed to parse (NA date):")
+print(bad_idx)
+print("The bad rows (first few columns):")
+print(bad_rows %>% select(UTCDateTime, sensor_id, date_created, everything()) %>% head(3))
 
 ```
 
 ## Question 5
 Create a series of EDA plots (cdf, boxplot, histogram, time series) of the `pm2_5_atm` variable from `PA_data_merged`. Use `color =` or `fill =` as an aesthetic to differentiate each sensor by `sensor_ID`. Do the data have a central tendency? Do they appear normally distributed? Do events show up in the time series?  Note: the variable `pm2_5_atm` is the concentration of fine particulate matter air pollution in micrograms per cubic meter ($\mu g/m^3$).
+
+```{r}
+
+if (exists("bad_idx") && length(bad_idx) > 0) {
+  PA_data_merged$UTCDateTime[bad_idx] <- str_sub(
+    PA_data_merged$UTCDateTime[bad_idx], 
+    start = 1, 
+    end = 19
+  )
+  PA_data_merged <- PA_data_merged %>% 
+    mutate(UTCDateTime = ymd_hms(UTCDateTime)) 
+}
+
+# Ensure pm2_5_atm is numeric 
+PA_data_merged <- PA_data_merged %>%
+  mutate(pm2_5_atm = as.numeric(pm2_5_atm))
+
+
+# 1. CDF Plot (Cumulative Distribution Function)
+ggplot(PA_data_merged, aes(x = pm2_5_atm, color = sensor_id)) +
+  stat_ecdf(geom = "step") + 
+  labs(title = "1. Cumulative Distribution Function (CDF)",
+       y = "Proportion",
+       x = expression(PM[2.5] ~ (mu * g/m^3)),
+       color = "Sensor ID") +
+  theme_minimal()
+
+# 2. Boxplot
+ggplot(PA_data_merged, aes(y = pm2_5_atm, x = sensor_id, fill = sensor_id)) +
+  geom_boxplot() +
+  labs(title = "2. Boxplot (Central Tendency & Spread)",
+       x = "Sensor ID",
+       y = expression(PM[2.5] ~ (mu * g/m^3))) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# 3. Histogram
+ggplot(PA_data_merged, aes(x = pm2_5_atm, fill = sensor_id)) +
+  geom_histogram(bins = 50, position = "identity", alpha = 0.5) + 
+  labs(title = "3. Histogram (Distribution Shape)",
+       x = expression(PM[2.5] ~ (mu * g/m^3)),
+       y = "Count",
+       fill = "Sensor ID") +
+  theme_minimal()
+
+# 4. Time Series Plot
+ggplot(PA_data_merged, aes(x = UTCDateTime, y = pm2_5_atm, color = sensor_id)) +
+  geom_line(alpha = 0.8) +
+  labs(title = "4. Time Series (Events & Trend)",
+       x = "Date/Time (UTC)",
+       y = expression(PM[2.5] ~ (mu * g/m^3))) +
+  theme_minimal() +
+  guides(color = guide_legend(title = "Sensor"))
+
+```
+
 
 ### Extra Credit
 Create the EDA figures within a single plot (hint: use the `gridExtra::` package).  Show only one legend and place it within the body of the CDF plot (hint: to move or remove a legend, add a call that uses a version of `theme(legend.position = ...)`).
