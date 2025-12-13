@@ -1,0 +1,155 @@
+---
+title: 'MECH481A6: Engineering Data Analysis in R'
+subtitle: 'Chapter 9 Homework: Transformations'
+author: "Thomas Robert"
+date: 'Dec. 12th'
+output: pdf_document
+
+---
+
+```{r global-options, include=FALSE}
+# set global options for figures, code, warnings, and messages
+knitr::opts_chunk$set(fig.width=6, fig.height=4, fig.path="../figs/",
+                      echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+# Load packages
+
+```{r load-packages, message=FALSE}
+# load packages for current session
+library(tidyverse) 
+library(gridExtra) # or library(patchwork) for arranging figures
+library(MASS) # for fitting distributions to your data
+```
+
+# Chapter 9 Homework
+
+This homework will give you practice at transforming and visualizing data and fitting a distribution to a set of data. Note that much of the code needed to complete this homework can be adapted from the [Coursebook Exercises](https://smogdr.github.io/edar_coursebook/transform.html#ch-9-exercises) in Chapter 9.
+
+When a question asks you to make a plot, remember to set a theme, title, 
+subtitle, labels, colors, etc. It is up to you how to personalize your plots, 
+but put in some effort and make the plotting approach consistent throughout
+the document. For example, you could use the same theme for all plots. 
+
+\newpage
+
+## Question 1
+
+Recreate Figure 9.8 (the three EDA plots based on `salary_ps2$salary`), but show the plots on a log-scale x-axis. Plot the histogram with 30 bins and move the legends so that they don't block the data. Does the data in these plots appear more symmetric about the median?  Why or why not?
+```{r import-clean-data}
+
+salary_data <- read_csv("salary_ch9.csv")
+
+```
+
+```{r plot-log-scale}
+
+p_box <- ggplot(salary_data, aes(y = sex, x = salary, color = sex)) +
+  geom_boxplot(outlier.shape = NA) + 
+  geom_point(alpha = 0.5, position = position_jitter(width = 0.2), size = 1) +
+  scale_x_log10(labels = scales::dollar_format(scale = 0.001, suffix = "k")) +
+  labs(
+    title = "Annual Salary Distribution by Sex (Log Scale)",
+    subtitle = "The median salary for Men is higher than for Women, with wider spread and higher outliers",
+    x = "Annual Salary ($1000s, Log Scale)",
+    y = "Sex", 
+    color = "Sex"
+  ) +
+  theme_minimal() + 
+  theme(legend.position = "none")
+
+p_hist <- ggplot(salary_data, aes(x = salary, fill = sex)) +
+  geom_histogram(bins = 30, position = "identity", alpha = 0.7) + 
+  scale_x_log10(labels = scales::dollar_format(scale = 0.001, suffix = "k")) + 
+  labs(
+    title = "Annual Salary Histogram (30 Bins, Log Scale)",
+    subtitle = "On a log scale, the data approaches a symmetric distribution, confirming log-transformation effectiveness.",
+    x = "Annual Salary ($1000s, Log Scale)",
+    y = "Count",
+    fill = "Sex"
+  ) +
+  theme_minimal() +
+  theme(legend.position = c(0.8, 0.85))
+
+p_cdf <- ggplot(salary_data, aes(x = salary, color = sex)) +
+  stat_ecdf(geom = "step") +
+  scale_x_log10(labels = scales::dollar_format(scale = 0.001, suffix = "k")) + 
+  labs(
+    title = "Cumulative Distribution Function (CDF) of Salary",
+    subtitle = "The male salary curve shifts right, indicating that for any given salary amount, a greater proportion of women earn less than that amount.",
+    x = "Annual Salary ($1000s, Log Scale)",
+    y = "Proportion",
+    color = "Sex"
+  ) +
+  theme_minimal() +
+  theme(legend.position = c(0.2, 0.85))
+
+grid.arrange(p_box, p_hist, p_cdf, ncol = 2, 
+             top = "figure 9.8 Modified: 2017 Annual Salaries on a Log Scale")
+
+```
+
+## Question 2
+
+Modify the code that created the `sal_simulate` data frame to create a variable that simulates quantiles from a *cumulative distribution*. Plot these data (instead of a histogram).  Hint: instead of `rlnorm()` you will need to use a different log density function that takes a vector of quantiles as input (you will need to specify the quantile vector).  Type ?Lognormal into the Console for help.
+
+```{r fig9-9-cdf, include=FALSE}
+#fit the data to a lognormal distribution
+
+# --- Step 1: Fit the salary data to a lognormal distribution ---
+
+salary_data_filtered <- salary_data %>%
+  filter(is.finite(salary) & salary > 0)
+log_salary <- log(salary_data_filtered$salary)
+lognorm_fit <- MASS::fitdistr(log_salary, "normal")
+mean_log <- lognorm_fit$estimate["mean"]
+sd_log <- lognorm_fit$estimate["sd"]
+quantile_vector <- seq(0.001, 0.999, length.out = 1000)
+sal_simulate <- data.frame(
+  salary = qlnorm(p = quantile_vector, 
+                  meanlog = mean_log, 
+                  sdlog = sd_log)
+)
+
+p_cdf_simulate <- ggplot(sal_simulate, aes(x = salary)) +
+  stat_ecdf(geom = "step", color = "blue", linewidth = 1) +
+  stat_ecdf(data = salary_data, aes(x = salary), color = "red", linetype = "dashed", linewidth = 1) +
+  scale_x_log10(labels = scales::dollar_format(scale = 0.001, suffix = "k")) +
+  labs(
+    title = "Simulated CDF vs. Actual Salary Data",
+    subtitle = paste0("Fitted Lognormal Parameters: meanlog = ", round(mean_log, 3), ", sdlog = ", round(sd_log, 3)),
+    x = "Annual Salary ($1000s, Log Scale)",
+    y = "Proportion"
+  ) +
+  theme_minimal()
+
+print(p_cdf_simulate)
+
+
+
+```
+
+## Question 3
+Mutate the `salary_ps2` data frame to create a new column variable that takes the log of the salary data (call that variable `log.salary`).  Then use `fitdistr()` to fit a *normal distribution* to `log.salary`.  What are the resultant parameter estimates for the mean and sd?  Hint: the output of `fitdistr()` is a list; look in the `estimate` entry for these parameters.  How close are these estimates to those calculated in [section 9.6.4](https://smogdr.github.io/edar_coursebook/transform.html#fit-a-log-normal-distribution) of the Coursebook?
+
+```{r fit-nomral}
+
+library(MASS) 
+salary_data_filtered <- salary_data %>%
+  filter(is.finite(salary) & salary > 0)
+
+salary_data_filtered <- salary_data_filtered %>%
+  mutate(log.salary = log(salary))
+
+fit_results <- fitdistr(salary_data_filtered$log.salary, "normal")
+
+mean_log_estimate <- fit_results$estimate["mean"]
+sd_log_estimate <- fit_results$estimate["sd"]
+
+print("Parameter Estimates for the Normal Distribution fitted to log.salary:")
+print(paste("Mean (mu):", round(mean_log_estimate, 4)))
+print(paste("Standard Deviation (sigma):", round(sd_log_estimate, 4)))
+
+```
+
+
