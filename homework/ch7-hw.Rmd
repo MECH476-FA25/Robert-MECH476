@@ -356,18 +356,22 @@ What is the difference in salary between men and women at the median?
  
 At the top percentile (maximum)? 
 
-  * Maximum salary for women is 
-  * Maximum salary for men is 
-  * The difference at the maximum is 
+  * Maximum salary for women is : $110,000
+  * Maximum salary for men is : $120,000
+  * The difference at the maximum is : $10,000
 
 Do you think there is a salary difference by gender across the pay scale? What
 other information would you need to test your hypothesis?
+
+Based on the data, yes. 
 
 ## Question 8: Hypothetical analysis
 
 Think about what other variables you would like to include in an hypothetical
 analysis. From your perspective, what are the most important individual,
 family, and workforce factors related to salary---beyond gender and age?
+
+In a hypothetical study, I'd like to see what the individual's education levels were. From my perspective, experience is the greatest determining factor. 
 
 \newpage
 
@@ -383,6 +387,19 @@ see any patterns when considering the third variable?
 ```{r mpg-plot}
 # call mpg pdf - you need to recreate it 
 knitr::include_graphics("./mpg-ch7-plot.pdf")
+
+mpg$cyl <- as.factor(mpg$cyl)
+ggplot(mpg, aes(x = displ, y = hwy, color = cyl)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE) + 
+  labs(
+    title = "Highway MPG vs. Engine Displacement, Differentiated by Cylinders",
+    x = "Engine Displacement (Liters)",
+    y = "Highway Miles Per Gallon (MPG)",
+    color = "Cylinders"
+  ) +
+  theme_classic()
+
 ```
 
 \newpage
